@@ -8,9 +8,16 @@
 #include <QMainWindow>
 #include "credentialwidget.h"
 
+#include <QLibrary>
+#include <Windows.h>
+
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
+
+typedef void (WINAPI* t_accessPersonalData)(char* outbuf, const size_t len, const size_t i);
+typedef void (WINAPI* t_setPersonalData)(char* inbuf, const size_t len, const size_t i);
+
 
 class MainWindow : public QMainWindow
 {
@@ -28,6 +35,11 @@ private:
     int m_current_id = -1;
     bool m_field = 0;
     bool m_isStartup = true;
+
+    QLibrary lib;
+    t_accessPersonalData accessPersonalData = nullptr;
+    t_setPersonalData setPersonalData = nullptr;
+    bool loadLibrary();
 
 public slots:
     int decryptFile(const QByteArray &aes256_key, const QByteArray &encryptedBytes, QByteArray &decryptedBytes);

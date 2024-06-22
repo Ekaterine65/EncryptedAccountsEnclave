@@ -33,6 +33,12 @@ typedef struct ms_accessPD_t {
 	size_t ms_i;
 } ms_accessPD_t;
 
+typedef struct ms_setPD_t {
+	char* ms_inbuf;
+	size_t ms_len;
+	size_t ms_i;
+} ms_setPD_t;
+
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
 	int ms_leaf;
@@ -119,27 +125,78 @@ err:
 	return status;
 }
 
+static sgx_status_t SGX_CDECL sgx_setPD(void* pms)
+{
+	CHECK_REF_POINTER(pms, sizeof(ms_setPD_t));
+	//
+	// fence after pointer checks
+	//
+	sgx_lfence();
+	ms_setPD_t* ms = SGX_CAST(ms_setPD_t*, pms);
+	ms_setPD_t __in_ms;
+	if (memcpy_s(&__in_ms, sizeof(ms_setPD_t), ms, sizeof(ms_setPD_t))) {
+		return SGX_ERROR_UNEXPECTED;
+	}
+	sgx_status_t status = SGX_SUCCESS;
+	char* _tmp_inbuf = __in_ms.ms_inbuf;
+	size_t _tmp_len = __in_ms.ms_len;
+	size_t _len_inbuf = _tmp_len;
+	char* _in_inbuf = NULL;
+
+	CHECK_UNIQUE_POINTER(_tmp_inbuf, _len_inbuf);
+
+	//
+	// fence after pointer checks
+	//
+	sgx_lfence();
+
+	if (_tmp_inbuf != NULL && _len_inbuf != 0) {
+		if ( _len_inbuf % sizeof(*_tmp_inbuf) != 0)
+		{
+			status = SGX_ERROR_INVALID_PARAMETER;
+			goto err;
+		}
+		_in_inbuf = (char*)malloc(_len_inbuf);
+		if (_in_inbuf == NULL) {
+			status = SGX_ERROR_OUT_OF_MEMORY;
+			goto err;
+		}
+
+		if (memcpy_s(_in_inbuf, _len_inbuf, _tmp_inbuf, _len_inbuf)) {
+			status = SGX_ERROR_UNEXPECTED;
+			goto err;
+		}
+
+	}
+	setPD(_in_inbuf, _tmp_len, __in_ms.ms_i);
+
+err:
+	if (_in_inbuf) free(_in_inbuf);
+	return status;
+}
+
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
-	struct {void* call_addr; uint8_t is_priv; uint8_t is_switchless;} ecall_table[1];
+	struct {void* call_addr; uint8_t is_priv; uint8_t is_switchless;} ecall_table[2];
 } g_ecall_table = {
-	1,
+	2,
 	{
 		{(void*)(uintptr_t)sgx_accessPD, 0, 0},
+		{(void*)(uintptr_t)sgx_setPD, 0, 0},
 	}
 };
 
 SGX_EXTERNC const struct {
 	size_t nr_ocall;
-	uint8_t entry_table[5][1];
+	uint8_t entry_table[5][2];
 } g_dyn_entry_table = {
 	5,
 	{
-		{0, },
-		{0, },
-		{0, },
-		{0, },
-		{0, },
+		{0, 0, },
+		{0, 0, },
+		{0, 0, },
+		{0, 0, },
+		{0, 0, },
 	}
 };
 

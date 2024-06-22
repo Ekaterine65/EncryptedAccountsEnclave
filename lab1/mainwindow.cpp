@@ -12,7 +12,8 @@
 #include <QLibrary>
 #include <Windows.h>
 
-typedef void (WINAPI* t_accessPersonalData)(char* outbuf, const size_t len, const size_t i);
+//typedef void (WINAPI* t_accessPersonalData)(char* outbuf, const size_t len, const size_t i);
+//typedef void (WINAPI* t_setPersonalData)(char* inbuf, const size_t len, const size_t i);
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -21,25 +22,34 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     connect(ui->lineEdit, &QLineEdit::textEdited, this, &MainWindow::filterList);
 
-    QLibrary lib;
-    lib.setFileName("UntrustedDll.dll");
-    if(!lib.load()){
-        qDebug() << "*** library not loaded";
+    if (!loadLibrary()) {
+        qDebug() << "*** Failed to load library";
     }
-    t_accessPersonalData accessPersonalData = (t_accessPersonalData) lib.resolve("accessPersonalData");
-    if (accessPersonalData) {
-        char buffer[1024] = {0};
-        accessPersonalData(buffer, 1024, 1);
-        qDebug() << "*** accessPersonalData = " << buffer;
-    } else {
-        qDebug() << "*** function not loaded";
-    }
-
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+bool MainWindow::loadLibrary()
+{
+    lib.setFileName("UntrustedDll.dll");
+    if (!lib.load()) {
+        qDebug() << "*** library not loaded";
+        return false;
+    }
+    setPersonalData = (t_setPersonalData) lib.resolve("setPersonalData");
+    if (!setPersonalData) {
+        qDebug() << "*** setPersonalData function not loaded";
+        return false;
+    }
+    accessPersonalData = (t_accessPersonalData) lib.resolve("accessPersonalData");
+    if (!accessPersonalData) {
+        qDebug() << "*** accessPersonalData function not loaded";
+        return false;
+    }
+    return true;
 }
 
 /* функция считывает учётные записи из файла JSON в стурктуру данных QLjst */
@@ -65,11 +75,35 @@ bool MainWindow::readJSON(const QByteArray &aes256_key)
 
     QJsonObject rootObject = jsonDoc.object();
 
-    for(auto itm : rootObject["credit"].toArray()) {
-           qDebug() << "*** itm = " << itm;
-       }
+    /*
+    QJsonArray sitesArray;
+    for (auto itm : rootObject["credit"].toArray()) {
+        qDebug() << "*** itm = " << itm;
+        QJsonObject siteObject;
+        siteObject["site"] = itm.toObject()["site"];
+        sitesArray.append(siteObject);
+    }
 
-    m_jsonarray = rootObject["credit"].toArray();
+    m_jsonarray = sitesArray;
+    for (auto itm : m_jsonarray) {
+        qDebug() << "*** m_jsonarray itm = " << itm;
+    }
+    */
+    QJsonArray jsonArray = rootObject["credit"].toArray();
+
+    //запись данных в анклав
+    for (int i = 0; i < jsonArray.size(); ++i) {
+        QJsonObject jsonObject = jsonArray[i].toObject();
+        QString jsonString = QString(QJsonDocument(jsonObject).toJson(QJsonDocument::Compact));
+        QByteArray jsonBytes = jsonString.toUtf8();
+        qDebug() << "*** setPersonalData jsonBytes.constData()" << const_cast<char*>(jsonBytes.constData());
+        setPersonalData(const_cast<char*>(jsonBytes.constData()), jsonBytes.size(), i);
+    }
+    char buffer[1024] = {0};
+    accessPersonalData(buffer, 1024, 1);
+    qDebug() << "*** accessPersonalData in readJSON = " << buffer;
+
+
     return true;
 }
 
@@ -78,21 +112,27 @@ void MainWindow::filterList(const QString &text)
     ui->listWidget->clear();
     qDebug() << "*** text" << text;
 
-    for (int i = 0; i < m_jsonarray.size(); i++){
-        if (m_jsonarray[i].toObject()["site"].toString().contains(text, Qt::CaseInsensitive) || text == "") {
-            QListWidgetItem * item = new QListWidgetItem();
-            credentialwidget * itemWidget =
-                    new credentialwidget(m_jsonarray[i].toObject()["site"].toString(), i);
+    for (int i = 0; i < 100; ++i) { // Предполагаем 100 учетных записей (можно изменить)
+        char buffer[1024] = {0};
+        accessPersonalData(buffer, 1024, i);
+        qDebug() << "*** accessPersonalData in filterList = " << buffer;
+
+        QJsonDocument jsonDoc = QJsonDocument::fromJson(QByteArray(buffer));
+        QJsonObject jsonObject = jsonDoc.object();
+        QString site = jsonObject["site"].toString();
+
+        if (site.contains(text, Qt::CaseInsensitive) || text.isEmpty()) {
+            QListWidgetItem *item = new QListWidgetItem();
+            credentialwidget *itemWidget = new credentialwidget(site, i);
             QObject::connect(itemWidget, &credentialwidget::decryptLoginPassword,
                              this, &MainWindow::decryptLoginPassword);
-
-            qDebug() << "m_jsonarray" << m_jsonarray[i].toObject()["site"].toString(), m_jsonarray[i].toObject()["login"].toString(), m_jsonarray[i].toObject()["password"].toString();
 
             item->setSizeHint(itemWidget->sizeHint());
             ui->listWidget->addItem(item);
             ui->listWidget->setItemWidget(item, itemWidget);
         }
     }
+
 }
 
 int MainWindow::decryptFile(
@@ -156,16 +196,28 @@ void MainWindow::on_editPin_returnPressed()
             ui->stackedWidget->setCurrentIndex(1);
             filterList("");
             m_isStartup = false;
+            char buffer[1024] = {0};
+            accessPersonalData(buffer, 1024, 1);
+            qDebug() << "*** accessPersonalData in m_isStartup = " << buffer;
+
         } else {
             ui->labLogin->setText("Неверный пин");
             ui->labLogin->setStyleSheet("color:red;");
         }
 
     } else {
+
+        char buffer[1024] = {0};
+        accessPersonalData(buffer, 1024, m_current_id);
+        qDebug() << "*** accessPersonalData in clipboard = " << buffer;
+
+        QJsonDocument jsonDoc = QJsonDocument::fromJson(QByteArray(buffer));
+        QJsonObject jsonObject = jsonDoc.object();
+
         if (m_field) {
-            QGuiApplication::clipboard()->setText(m_jsonarray[m_current_id].toObject()["password"].toString());
+            QGuiApplication::clipboard()->setText(jsonObject["login"].toString());
         } else {
-            QGuiApplication::clipboard()->setText(m_jsonarray[m_current_id].toObject()["login"].toString());
+            QGuiApplication::clipboard()->setText(jsonObject["password"].toString());
         }
 
 
@@ -187,5 +239,6 @@ void MainWindow::decryptLoginPassword(int id, credentialwidget::FIELD field)
     qDebug() << "*** field" << field;
     m_field = field;
     m_current_id = id;
+    qDebug() << "*** m_current_id" << m_current_id;
     ui->stackedWidget->setCurrentIndex(0);
 }

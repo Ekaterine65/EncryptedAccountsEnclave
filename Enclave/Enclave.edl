@@ -4,6 +4,7 @@ enclave {
     trusted {
         /* define ECALLs here. */
         public void accessPD([out, size=len] char* outbuf, size_t len, size_t i);
+        public void setPD([in, size=len] char* inbuf, size_t len, size_t i);
     };
 
     untrusted {

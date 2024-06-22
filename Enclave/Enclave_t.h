@@ -14,6 +14,7 @@ extern "C" {
 #endif
 
 void accessPD(char* outbuf, size_t len, size_t i);
+void setPD(char* inbuf, size_t len, size_t i);
 
 sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf);
 sgx_status_t SGX_CDECL sgx_thread_wait_untrusted_event_ocall(int* retval, const void* self);

@@ -52,3 +52,10 @@ void accessPersonalData(
     accessPD(eid, outbuf, len, i);
 }
 
+void setPersonalData(
+    char* inbuf,
+    const size_t len,
+    const size_t i) 
+{
+    setPD(eid, inbuf, len, i);
+}

@@ -36,6 +36,7 @@ int SGX_UBRIDGE(SGX_CDECL, sgx_thread_set_multiple_untrusted_events_ocall, (cons
 #endif
 
 sgx_status_t accessPD(sgx_enclave_id_t eid, char* outbuf, size_t len, size_t i);
+sgx_status_t setPD(sgx_enclave_id_t eid, char* inbuf, size_t len, size_t i);
 
 #ifdef __cplusplus
 }

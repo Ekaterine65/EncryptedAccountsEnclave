@@ -7,6 +7,12 @@ typedef struct ms_accessPD_t {
 	size_t ms_i;
 } ms_accessPD_t;
 
+typedef struct ms_setPD_t {
+	char* ms_inbuf;
+	size_t ms_len;
+	size_t ms_i;
+} ms_setPD_t;
+
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
 	int ms_leaf;
@@ -97,6 +103,17 @@ sgx_status_t accessPD(sgx_enclave_id_t eid, char* outbuf, size_t len, size_t i)
 	ms.ms_len = len;
 	ms.ms_i = i;
 	status = sgx_ecall(eid, 0, &ocall_table_Enclave, &ms);
+	return status;
+}
+
+sgx_status_t setPD(sgx_enclave_id_t eid, char* inbuf, size_t len, size_t i)
+{
+	sgx_status_t status;
+	ms_setPD_t ms;
+	ms.ms_inbuf = inbuf;
+	ms.ms_len = len;
+	ms.ms_i = i;
+	status = sgx_ecall(eid, 1, &ocall_table_Enclave, &ms);
 	return status;
 }
 

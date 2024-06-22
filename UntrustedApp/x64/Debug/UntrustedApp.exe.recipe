@@ -2,7 +2,7 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>C:\D\Apps\test\testEnclave\Lab3\x64\Debug\UntrustedApp.exe</FullPath>
+      <FullPath>E:\WorkDir\lab1_3_mix\x64\Debug\UntrustedApp.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles />
